@@ -37,39 +37,39 @@ jobs:
           /tmp/gradle-dist/gradle-8.4/bin/gradle wrapper --gradle-version=8.4
           ./gradlew --version
 
-      - name: Generate keystore
+      - name: Generate keystore (same password for store and key)
         working-directory: android-app
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           keytool -genkeypair -v \
             -keystore yapson.keystore \
             -alias yapson \
             -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_PASSWORD }}" \
+            -storepass "${KEYSTORE_PASSWORD}" \
+            -keypass "${KEYSTORE_PASSWORD}" \
             -dname "CN=Yapson, O=Yapson, C=CI"
 
       - name: Build APK (debug)
         working-directory: android-app
         run: |
-          ./gradlew assembleDebug --no-daemon 2>&1 | tail -20
-          find app/build/outputs -name "*.apk" 2>/dev/null || echo "No APK yet"
+          ./gradlew assembleDebug --no-daemon 2>&1 | tail -10
+          find app/build/outputs -name "*.apk"
 
-      - name: Sign APK
+      - name: Sign APK with jarsigner
         working-directory: android-app
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
-          echo "APK: $APK"
-          $ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign -v -p 4 "$APK" app-aligned.apk
-          $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
-            --ks yapson.keystore \
-            --ks-pass "pass:${KEYSTORE_PASSWORD}" \
-            --key-pass "pass:${KEY_PASSWORD}" \
-            --ks-key-alias yapson \
-            --out app-release-signed.apk \
-            app-aligned.apk
+          APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          echo "Signing: $APK"
+          jarsigner -verbose \
+            -keystore yapson.keystore \
+            -storepass "${KEYSTORE_PASSWORD}" \
+            -keypass "${KEYSTORE_PASSWORD}" \
+            -signedjar app-release-signed.apk \
+            "$APK" yapson
+          echo "Result:"
           ls -lh app-release-signed.apk
 
       - name: Upload APK
