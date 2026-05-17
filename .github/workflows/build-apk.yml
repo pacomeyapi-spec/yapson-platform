@@ -26,8 +26,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android build tools
-        run: sdkmanager "build-tools;34.0.0" "platforms;android-34"
+      - name: Install Android build tools & platform
+        run: |
+          sdkmanager "build-tools;34.0.0" "platforms;android-34" --sdk_root=$ANDROID_SDK_ROOT
 
       - name: Generate keystore
         working-directory: android-app
@@ -40,9 +41,10 @@ jobs:
             -keypass "${{ secrets.KEY_PASSWORD }}" \
             -dname "CN=Yapson, O=Yapson, C=CI"
 
-      - name: Install Gradle Wrapper
-        working-directory: android-app
-        run: gradle wrapper --gradle-version=8.4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
 
       - name: Build APK
         working-directory: android-app
@@ -50,18 +52,29 @@ jobs:
           KEYSTORE_PATH: yapson.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          gradle assembleRelease --no-daemon --stacktrace
 
-      - name: List APK files
-        run: find android-app -name "*.apk" 2>/dev/null
+      - name: Sign APK
+        working-directory: android-app
+        run: |
+          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
+          echo "Found APK: $APK"
+          $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
+            --ks yapson.keystore \
+            --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+            --ks-key-alias yapson \
+            --out app-release-signed.apk \
+            "$APK"
+          ls -la app-release-signed.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: yapson-platform-v${{ github.run_number }}
-          path: android-app/app/build/outputs/apk/release/*.apk
+          path: android-app/app-release-signed.apk
           if-no-files-found: warn
           retention-days: 90
 
@@ -70,9 +83,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: "Yapson Platform v${{ github.run_number }}"
+          name: "Yapson Platform APK v${{ github.run_number }}"
           body: "APK Android - Yapson Platform Mobile Money"
-          files: android-app/app/build/outputs/apk/release/*.apk
+          files: android-app/app-release-signed.apk
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
