@@ -1,11 +1,11 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 const connectpro = require('../services/connectpro');
 
 const prisma = new PrismaClient();
 
-// Réseaux autorisés
+// ── Réseaux autorisés ────────────────────────────────────────────────────────
 router.get('/networks', authenticate, async (req, res) => {
   try {
     const allNetworks = await connectpro.getNetworks();
@@ -17,7 +17,9 @@ router.get('/networks', authenticate, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Créer une transaction
+// ── Créer une transaction ────────────────────────────────────────────────────
+// Chaque transaction est sauvegardée localement avec l'userId de celui qui la crée.
+// L'historique de la plateforme est totalement indépendant de ConnectPro.
 router.post('/transactions', authenticate, async (req, res) => {
   const { type, network, phone, amount } = req.body;
   if (!type || !network || !phone || !amount)
@@ -37,7 +39,7 @@ router.post('/transactions', authenticate, async (req, res) => {
   const networks = await connectpro.getNetworks();
   const net = networks.find(n => n.code === network) || { nom: network };
 
-  // Sauvegarder en BDD (upsert pour éviter les doublons)
+  // Sauvegarder en BDD — lié à l'utilisateur qui a initié la transaction
   try {
     await prisma.transaction.upsert({
       where: { connectproUid: tx.uid },
@@ -56,13 +58,14 @@ router.post('/transactions', authenticate, async (req, res) => {
     });
   } catch(dbErr) {
     console.error('DB save error:', dbErr.message);
-    // On retourne quand même le résultat ConnectPro même si la BDD a échoué
   }
 
   res.status(201).json(tx);
 });
 
-// Lister les transactions
+// ── Historique ───────────────────────────────────────────────────────────────
+// AGENT → seulement ses propres transactions
+// ADMIN → toutes les transactions de tous les agents de la plateforme
 router.get('/transactions', authenticate, async (req, res) => {
   try {
     const { page = 1, pageSize = 20, type, status, network, phone } = req.query;
@@ -101,7 +104,7 @@ router.get('/transactions', authenticate, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Détail d'une transaction
+// ── Détail d'une transaction ─────────────────────────────────────────────────
 router.get('/transactions/:uid', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'ADMIN') {
@@ -115,7 +118,7 @@ router.get('/transactions/:uid', authenticate, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Compte ConnectPro
+// ── Compte ConnectPro ────────────────────────────────────────────────────────
 router.get('/account', authenticate, async (req, res) => {
   try {
     const account = await connectpro.getAccount();
@@ -123,65 +126,11 @@ router.get('/account', authenticate, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── Route de synchronisation : importer les tx ConnectPro en BDD ───────────
-// Permet de récupérer les transactions passées qui n'ont pas été enregistrées
-router.post('/sync', authenticate, async (req, res) => {
+// ── Admin : vider toutes les transactions importées par erreur ───────────────
+router.delete('/clear-all', authenticate, requireAdmin, async (req, res) => {
   try {
-    const networks = await connectpro.getNetworks();
-    const netMap = Object.fromEntries(networks.map(n => [n.code, n.nom]));
-
-    // Récupérer les tx ConnectPro (dernière page)
-    const { getTransactions } = require('../services/connectpro');
-    const data = await getTransactions({ pageSize: 100 });
-    const txList = data.results || [];
-
-    let imported = 0, skipped = 0;
-
-    for (const tx of txList) {
-      if (!tx.uid) continue;
-
-      // Trouver quel utilisateur a fait cette tx (on cherche par téléphone + réseau)
-      // Si on ne sait pas, on l'attribue à l'admin
-      const userId = req.user.id; // L'utilisateur qui lance la sync se l'attribue si non trouvé
-
-      try {
-        await prisma.transaction.upsert({
-          where: { connectproUid: tx.uid },
-          update: { status: tx.status || 'pending' },
-          create: {
-            connectproUid: tx.uid,
-            type: tx.type || 'deposit',
-            amount: parseFloat(tx.amount || 0),
-            formattedAmount: tx.formatted_amount || null,
-            phone: tx.recipient_phone || '',
-            networkCode: tx.network?.code || '',
-            networkName: tx.network?.nom || netMap[tx.network?.code] || '',
-            status: tx.status || 'pending',
-            userId: userId,
-          }
-        });
-        imported++;
-      } catch { skipped++; }
-    }
-
-    res.json({ message: `Sync terminée`, imported, skipped, total: txList.length });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-
-// ─── Route admin : réattribuer toutes les tx admin à un agent ───────────────
-router.post('/reassign', authenticate, async (req, res) => {
-  if (req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Admin uniquement' });
-  const { targetUserId } = req.body;
-  if (!targetUserId) return res.status(400).json({ error: 'targetUserId requis' });
-  try {
-    const adminUser = await prisma.user.findUnique({ where: { username: 'admin' } });
-    if (!adminUser) return res.status(404).json({ error: 'admin introuvable' });
-    const result = await prisma.transaction.updateMany({
-      where: { userId: adminUser.id },
-      data: { userId: targetUserId }
-    });
-    res.json({ message: `${result.count} transactions réattribuées`, count: result.count });
+    const result = await prisma.transaction.deleteMany({});
+    res.json({ message: `${result.count} transactions supprimées`, count: result.count });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
