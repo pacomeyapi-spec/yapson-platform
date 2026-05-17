@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Yapson</string>
+    <string name="default_url">https://yapson-platform-production.up.railway.app/</string>
+    <string name="asset_statements">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {
+                \"namespace\": \"web\",
+                \"site\": \"https://yapson-platform-production.up.railway.app\"
+            }
+        }]
+    </string>
+</resources>

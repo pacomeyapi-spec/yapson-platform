@@ -6,6 +6,7 @@ on:
     paths:
       - 'public/**'
       - '.github/workflows/build-apk.yml'
+      - 'android-app/**'
   workflow_dispatch:
 
 jobs:
@@ -22,21 +23,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Install Android build tools
         run: sdkmanager "build-tools;34.0.0" "platforms;android-34"
 
-      - name: Install Bubblewrap
-        run: npm install -g @bubblewrap/cli@latest
-
-      - name: Generate signing keystore
+      - name: Generate keystore
+        working-directory: android-app
         run: |
           keytool -genkeypair -v \
             -keystore yapson.keystore \
@@ -44,45 +38,41 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
             -keypass "${{ secrets.KEY_PASSWORD }}" \
-            -dname "CN=Yapson, OU=Mobile, O=Yapson, L=Abidjan, ST=Abidjan, C=CI"
+            -dname "CN=Yapson, O=Yapson, C=CI"
 
-      - name: Initialize & Build TWA project
+      - name: Install Gradle Wrapper
+        working-directory: android-app
+        run: gradle wrapper --gradle-version=8.4
+
+      - name: Build APK
+        working-directory: android-app
         env:
+          KEYSTORE_PATH: yapson.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          mkdir -p twa && cd twa
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
-          # Répondre "No" automatiquement à la question JDK, utiliser Java déjà installé
-          echo "No" | bubblewrap init \
-            --manifest="https://yapson-platform-production.up.railway.app/manifest.json"
-
-      - name: Configure signing & Build APK
-        working-directory: twa
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          # Mettre à jour la config de signature dans twa-manifest.json
-          node -e "
-            const fs = require('fs');
-            const m = JSON.parse(fs.readFileSync('twa-manifest.json'));
-            m.signingKey = { path: '../yapson.keystore', alias: 'yapson' };
-            fs.writeFileSync('twa-manifest.json', JSON.stringify(m, null, 2));
-          "
-
-          bubblewrap build \
-            --skipPwaValidation \
-            --signingKeyPath=../yapson.keystore \
-            --signingKeyAlias=yapson
-
-      - name: Find APK files
-        run: find . -name "*.apk" 2>/dev/null
+      - name: List APK files
+        run: find android-app -name "*.apk" 2>/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: yapson-apk-v${{ github.run_number }}
-          path: "**/*.apk"
+          name: yapson-platform-v${{ github.run_number }}
+          path: android-app/app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
           retention-days: 90
+
+      - name: Create Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Yapson Platform v${{ github.run_number }}"
+          body: "APK Android - Yapson Platform Mobile Money"
+          files: android-app/app/build/outputs/apk/release/*.apk
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
