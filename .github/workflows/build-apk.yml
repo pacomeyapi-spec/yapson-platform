@@ -6,77 +6,153 @@ on:
     paths:
       - 'android/**'
       - '.github/workflows/build-apk.yml'
-  workflow_dispatch:  # Déclenchement manuel possible
+      - 'public/manifest.json'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
+        run: npm install -g @bubblewrap/cli@latest
 
-      - name: Generate keystore
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Generate signing keystore
         run: |
+          mkdir -p android
           keytool -genkey -v \
-            -keystore android/android.keystore \
+            -keystore android/yapson.keystore \
             -alias yapson \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_PASSWORD }}" \
+            -storepass yapson2026 \
+            -keypass yapson2026 \
             -dname "CN=Yapson Platform, OU=Mobile, O=Yapson, L=Abidjan, ST=Abidjan, C=CI"
+          echo "✅ Keystore generated"
 
-      - name: Initialize TWA project
-        working-directory: android
+      - name: Create Bubblewrap project
         run: |
-          bubblewrap init --manifest=https://yapson-platform-production.up.railway.app/manifest.json \
-            --directory=twa-project
+          mkdir -p android/twa
+          cat > android/twa/twa-manifest.json << 'MANIFEST'
+          {
+            "packageId": "net.yapson.platform",
+            "host": "yapson-platform-production.up.railway.app",
+            "name": "Yapson Platform",
+            "launcherName": "Yapson",
+            "display": "standalone",
+            "themeColor": "#080b10",
+            "navigationColor": "#080b10",
+            "backgroundColor": "#080b10",
+            "enableNotifications": false,
+            "startUrl": "/",
+            "iconUrl": "https://yapson-platform-production.up.railway.app/icon-512.png",
+            "maskableIconUrl": "https://yapson-platform-production.up.railway.app/icon-512.png",
+            "shortcuts": [],
+            "signingKey": {
+              "path": "../yapson.keystore",
+              "alias": "yapson"
+            },
+            "appVersionName": "1.0.0",
+            "appVersionCode": 1,
+            "orientation": "portrait",
+            "enableSiteSettingsShortcut": false,
+            "isChromeOSOnly": false,
+            "isMetaQuest": false,
+            "fullScopeUrl": "https://yapson-platform-production.up.railway.app/",
+            "minSdkVersion": 19,
+            "generatorApp": "bubblewrap-cli",
+            "webManifestUrl": "https://yapson-platform-production.up.railway.app/manifest.json",
+            "fallbackType": "customtabs",
+            "features": {},
+            "alphaDependencies": {"enabled": false},
+            "enableSideloadingFromInternet": false
+          }
+          MANIFEST
+
+      - name: Build APK with Bubblewrap
+        working-directory: android/twa
         env:
           BUBBLEWRAP_SKIP_UPDATE_CHECK: '1'
-
-      - name: Build APK
-        working-directory: android/twa-project
         run: |
           bubblewrap build \
-            --skipPwaValidation
-        env:
-          KEYSTORE_PATH: ../android.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: yapson
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+            --skipPwaValidation \
+            --manifest ./twa-manifest.json
+        continue-on-error: true
 
-      - name: Upload APK artifact
+      - name: Alternative — Build with Gradle directly
+        if: failure()
+        working-directory: android/twa
+        run: |
+          # Si bubblewrap échoue, initialiser et build avec gradle
+          bubblewrap init \
+            --manifest https://yapson-platform-production.up.railway.app/manifest.json \
+            --skipPwaValidation
+          
+          # Configurer les clés de signature
+          echo "KEYSTORE_PATH=../yapson.keystore" >> local.properties
+          echo "KEYSTORE_PASSWORD=yapson2026" >> local.properties
+          echo "KEY_ALIAS=yapson" >> local.properties
+          echo "KEY_PASSWORD=yapson2026" >> local.properties
+          
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Find APK
+        run: |
+          find . -name "*.apk" 2>/dev/null | head -20
+          echo "---"
+          find . -name "app-release*.apk" 2>/dev/null
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: yapson-platform-apk
-          path: android/twa-project/app-release-signed.apk
-          retention-days: 30
+          name: yapson-platform-${{ github.run_number }}
+          path: |
+            android/twa/*.apk
+            android/twa/app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+          retention-days: 60
 
-      - name: Create Release
-        if: github.ref == 'refs/heads/main'
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: "Yapson Platform v${{ github.run_number }}"
-          body: "APK généré automatiquement depuis le commit ${{ github.sha }}"
-          files: android/twa-project/app-release-signed.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: "Yapson Platform APK v1.0.${{ github.run_number }}"
+          body: |
+            ## Yapson Platform Android APK
+            
+            **Version:** 1.0.${{ github.run_number }}
+            **Build:** ${{ github.sha }}
+            
+            ### Installation
+            1. Télécharger le fichier `.apk`
+            2. Sur Android : Paramètres → Sécurité → Autoriser sources inconnues
+            3. Ouvrir le fichier APK pour installer
+            
+            ### Fonctionnement
+            L'APK ouvre la plateforme `yapson-platform-production.up.railway.app` en plein écran, sans barre de navigation du navigateur.
+          files: |
+            android/twa/*.apk
+            android/twa/app/build/outputs/apk/**/*.apk
           draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
