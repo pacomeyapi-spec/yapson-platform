@@ -471,7 +471,6 @@ async function submitTx() {
   btn.disabled=true; btn.textContent='En cours...';
   try {
     const tx = await api('POST','/api/payments/transactions',{type:txType,network:selNet,phone,amount:parseFloat(amt)});
-    toast('Transaction créée ! Réf: '+tx.uid.substring(0,8)+'…','ok');
     document.getElementById('tx-phone').value=''; document.getElementById('tx-amt').value='';
     updSum();
   } catch(e) { toast(e.message,'err'); }
