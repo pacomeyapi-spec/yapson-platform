@@ -142,4 +142,53 @@ router.delete('/clear-all', authenticate, requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ── Webhook ConnectPro : mise à jour automatique du statut ───────────────────
+// ConnectPro appelle cette URL quand le statut d'une transaction change
+// URL à configurer dans ConnectPro : https://yapson-platform-production.up.railway.app/api/payments/webhook
+router.post('/webhook', async (req, res) => {
+  try {
+    const payload = req.body;
+    // ConnectPro peut envoyer uid ou transaction_uid ou id
+    const uid = payload.uid || payload.transaction_uid || payload.id;
+    const status = payload.status || payload.new_status;
+    
+    console.log('Webhook received:', JSON.stringify(payload).substring(0, 200));
+    
+    if (!uid) return res.status(400).json({ error: 'uid manquant dans le payload' });
+    if (!status) return res.status(400).json({ error: 'status manquant dans le payload' });
+
+    const updated = await prisma.transaction.updateMany({
+      where: { connectproUid: uid },
+      data: { status: status, updatedAt: new Date() }
+    });
+
+    console.log(`Webhook OK: ${uid} → ${status} (${updated.count} ligne mise à jour)`);
+    res.json({ ok: true, updated: updated.count });
+  } catch(e) {
+    console.error('Webhook error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
+
+// ── Webhook ConnectPro : mise à jour automatique du statut ───────────────────
+// ConnectPro appelle cette URL quand le statut d'une transaction change
+router.post('/webhook', async (req, res) => {
+  try {
+    const { uid, status } = req.body;
+    if (!uid || !status) return res.status(400).json({ error: 'uid et status requis' });
+
+    const updated = await prisma.transaction.updateMany({
+      where: { connectproUid: uid },
+      data: { status: status, updatedAt: new Date() }
+    });
+
+    console.log(`Webhook: ${uid} → ${status} (${updated.count} row updated)`);
+    res.json({ ok: true, updated: updated.count });
+  } catch(e) {
+    console.error('Webhook error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
