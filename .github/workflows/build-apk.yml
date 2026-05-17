@@ -1,0 +1,82 @@
+name: Build Yapson APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:  # Déclenchement manuel possible
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Generate keystore
+        run: |
+          keytool -genkey -v \
+            -keystore android/android.keystore \
+            -alias yapson \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -keypass "${{ secrets.KEY_PASSWORD }}" \
+            -dname "CN=Yapson Platform, OU=Mobile, O=Yapson, L=Abidjan, ST=Abidjan, C=CI"
+
+      - name: Initialize TWA project
+        working-directory: android
+        run: |
+          bubblewrap init --manifest=https://yapson-platform-production.up.railway.app/manifest.json \
+            --directory=twa-project
+        env:
+          BUBBLEWRAP_SKIP_UPDATE_CHECK: '1'
+
+      - name: Build APK
+        working-directory: android/twa-project
+        run: |
+          bubblewrap build \
+            --skipPwaValidation
+        env:
+          KEYSTORE_PATH: ../android.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: yapson
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yapson-platform-apk
+          path: android/twa-project/app-release-signed.apk
+          retention-days: 30
+
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Yapson Platform v${{ github.run_number }}"
+          body: "APK généré automatiquement depuis le commit ${{ github.sha }}"
+          files: android/twa-project/app-release-signed.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

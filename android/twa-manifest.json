@@ -1,0 +1,38 @@
+{
+  "packageId": "net.yapson.platform",
+  "host": "yapson-platform-production.up.railway.app",
+  "name": "Yapson Platform",
+  "launcherName": "Yapson",
+  "display": "standalone",
+  "themeColor": "#080b10",
+  "navigationColor": "#080b10",
+  "navigationColorDark": "#080b10",
+  "navigationDividerColor": "#1a2030",
+  "navigationDividerColorDark": "#1a2030",
+  "backgroundColor": "#080b10",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://yapson-platform-production.up.railway.app/icon-512.png",
+  "maskableIconUrl": "https://yapson-platform-production.up.railway.app/icon-512.png",
+  "shortcuts": [],
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "yapson"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "orientation": "portrait",
+  "enableSiteSettingsShortcut": false,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://yapson-platform-production.up.railway.app/",
+  "minSdkVersion": 19,
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://yapson-platform-production.up.railway.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSideloadingFromInternet": false
+}
