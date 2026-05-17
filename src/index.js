@@ -5,6 +5,8 @@ const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
+const { startPoller } = require('./services/statusPoller');
+
 const app = express();
 const prisma = new PrismaClient();
 
@@ -52,7 +54,10 @@ async function start() {
     }
   } catch(e) { console.error('Init error:', e.message); }
 
-  app.listen(PORT, () => console.log(`🚀 Port ${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`🚀 Port ${PORT}`);
+    startPoller();
+  });
 }
 
 start();
