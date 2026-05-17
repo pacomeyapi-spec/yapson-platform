@@ -40,8 +40,10 @@ async function createTransaction({ type, networkCode, phone, amount }) {
     amount: parseFloat(amount)
   };
 
-  const { data } = await client.post('/payments/user/transactions/', payload);
-  return data;
+  const response = await client.post('/payments/user/transactions/', payload);
+  // ConnectPro peut retourner { success, data: { uid, ... } } ou directement { uid, ... }
+  const result = response.data;
+  return result.data || result;
 }
 
 async function getTransactions({ page = 1, pageSize = 20, type, status, network, phone } = {}) {
