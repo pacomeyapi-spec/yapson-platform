@@ -26,6 +26,23 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android build tools
+        run: sdkmanager "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Download Gradle 8.4 wrapper
+        working-directory: android-app
+        run: |
+          # Télécharger le JAR du wrapper Gradle 8.4
+          curl -sL \
+            "https://services.gradle.org/distributions/gradle-8.4-bin.zip" \
+            -o /tmp/gradle-8.4.zip
+          unzip -q /tmp/gradle-8.4.zip -d /tmp/gradle-dist
+          GRADLE_BIN=/tmp/gradle-dist/gradle-8.4/bin/gradle
+          chmod +x $GRADLE_BIN
+          $GRADLE_BIN wrapper --gradle-version=8.4
+          echo "Gradle version:"
+          ./gradlew --version
+
       - name: Generate keystore
         working-directory: android-app
         run: |
@@ -43,25 +60,20 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          chmod +x gradlew
           ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file=yapson.keystore \
             -Pandroid.injected.signing.store.password="${KEYSTORE_PASSWORD}" \
             -Pandroid.injected.signing.key.alias=yapson \
             -Pandroid.injected.signing.key.password="${KEY_PASSWORD}" \
-            --no-daemon --stacktrace 2>&1 | tail -60
+            --no-daemon --info 2>&1 | tail -50
 
-      - name: Find APK
-        run: |
-          find android-app -name "*.apk" 2>/dev/null
-          ls android-app/app/build/outputs/apk/ 2>/dev/null || echo "No APK output dir"
+      - name: List output files
+        run: find android-app -name "*.apk" 2>/dev/null || echo "No APK found"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: yapson-apk-v${{ github.run_number }}
-          path: |
-            android-app/app/build/outputs/apk/**/*.apk
-            android-app/**/*.apk
+          path: "android-app/app/build/outputs/apk/release/*.apk"
           if-no-files-found: warn
           retention-days: 90
