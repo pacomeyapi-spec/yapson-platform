@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // Servir le frontend
-app.use(express.static(path.join(__dirname, '../../frontend')));
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Routes API
 app.use('/api/auth', require('./routes/auth'));
@@ -25,7 +25,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // SPA fallback
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, '../../frontend/index.html'));
+    res.sendFile(path.join(__dirname, '../public/index.html'));
   }
 });
 
