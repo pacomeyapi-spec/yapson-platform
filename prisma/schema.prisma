@@ -8,15 +8,29 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  username     String   @unique
-  password     String
-  role         String   @default("AGENT") // ADMIN ou AGENT
-  isActive     Boolean  @default(true)
-  // Réseaux autorisés pour cet utilisateur (JSON array de codes réseau)
-  // ex: ["mtn-ci","orange-ci","wave-ci"]
-  // null = tous les réseaux (admin uniquement)
+  id              String        @id @default(uuid())
+  username        String        @unique
+  password        String
+  role            String        @default("AGENT")
+  isActive        Boolean       @default(true)
   allowedNetworks String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  transactions    Transaction[]
+}
+
+model Transaction {
+  id              String   @id @default(uuid())
+  connectproUid   String   @unique
+  type            String
+  amount          Float
+  formattedAmount String?
+  phone           String
+  networkCode     String
+  networkName     String
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
 }
