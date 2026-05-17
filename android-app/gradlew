@@ -1,2 +1,23 @@
 #!/bin/sh
-exec gradle "$@"
+
+##############################################################################
+# Gradle start up script for UN*X
+##############################################################################
+
+# Validate before download
+if [ -z "$JAVA_HOME" ] ; then
+    JAVA_CMD=$(which java 2>/dev/null)
+else
+    JAVA_CMD="$JAVA_HOME/bin/java"
+fi
+
+# Use system gradle if wrapper not available
+WRAPPER_JAR="gradle/wrapper/gradle-wrapper.jar"
+if [ ! -f "$WRAPPER_JAR" ]; then
+    exec gradle "$@"
+fi
+
+exec "$JAVA_CMD" \
+    -classpath "$WRAPPER_JAR" \
+    org.gradle.wrapper.GradleWrapperMain \
+    "$@"
