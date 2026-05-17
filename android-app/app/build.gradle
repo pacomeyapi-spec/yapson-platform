@@ -16,7 +16,7 @@ android {
 
     signingConfigs {
         release {
-            storeFile file(System.getenv("KEYSTORE_PATH") ?: "yapson.keystore")
+            storeFile file(System.getenv("KEYSTORE_PATH") ?: "../yapson.keystore")
             storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
             keyAlias "yapson"
             keyPassword System.getenv("KEY_PASSWORD") ?: ""
