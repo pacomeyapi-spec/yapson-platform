@@ -75,8 +75,10 @@ jobs:
           # Zipalign d'abord
           $ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign -f -p 4 "$APK" app-aligned.apk
           
-          # Signer avec apksigner (v1+v2+v3) en passant le mdp via stdin
-          echo -n "${KS_PASS}" | $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
+          # Signer avec apksigner (v1+v2+v3)
+          # stdin attend 2 lignes : storepass puis keypass
+          printf '%s\n%s\n' "${KS_PASS}" "${KS_PASS}" | \
+            $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
             --ks yapson.keystore \
             --ks-key-alias yapson \
             --ks-pass stdin \
