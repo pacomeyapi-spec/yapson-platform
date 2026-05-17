@@ -168,4 +168,21 @@ router.post('/sync', authenticate, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ─── Route admin : réattribuer toutes les tx admin à un agent ───────────────
+router.post('/reassign', authenticate, async (req, res) => {
+  if (req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Admin uniquement' });
+  const { targetUserId } = req.body;
+  if (!targetUserId) return res.status(400).json({ error: 'targetUserId requis' });
+  try {
+    const adminUser = await prisma.user.findUnique({ where: { username: 'admin' } });
+    if (!adminUser) return res.status(404).json({ error: 'admin introuvable' });
+    const result = await prisma.transaction.updateMany({
+      where: { userId: adminUser.id },
+      data: { userId: targetUserId }
+    });
+    res.json({ message: `${result.count} transactions réattribuées`, count: result.count });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
