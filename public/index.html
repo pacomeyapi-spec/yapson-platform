@@ -186,6 +186,101 @@ tr:hover td{background:rgba(255,255,255,.015)}
   border-top-color:var(--green);border-radius:50%;animation:rot .7s linear infinite}
 @keyframes rot{to{transform:rotate(360deg)}}
 .ploading{padding:50px;text-align:center;color:var(--text2)}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE — Mobile & Tablette
+   ═══════════════════════════════════════ */
+
+/* Bouton hamburger (mobile uniquement) */
+.hamburger{display:none;position:fixed;top:14px;left:14px;z-index:200;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+  padding:8px 10px;cursor:pointer;font-size:18px;line-height:1;color:var(--text)}
+.hamburger:hover{background:var(--bg3)}
+
+/* Overlay de fermeture sidebar mobile */
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:149;backdrop-filter:blur(2px)}
+.sb-overlay.show{display:block}
+
+/* ─── Tablette (≤ 1024px) ─── */
+@media(max-width:1024px){
+  .sidebar{width:200px}
+  .page{padding:20px 18px}
+  .stats-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .nets-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  .users-grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+  .filters{gap:8px}
+  .filters input,.filters select{min-width:100px;font-size:12px}
+  th,td{padding:9px 12px}
+}
+
+/* ─── Mobile (≤ 768px) ─── */
+@media(max-width:768px){
+  /* Hamburger visible */
+  .hamburger{display:flex;align-items:center;justify-content:center}
+
+  /* Sidebar hors-écran par défaut, glisse depuis la gauche */
+  .sidebar{position:fixed;left:-260px;top:0;bottom:0;width:250px;z-index:150;
+    transition:left .25s ease;box-shadow:none}
+  .sidebar.open{left:0;box-shadow:4px 0 24px rgba(0,0,0,.4)}
+
+  /* Contenu prend toute la largeur */
+  #app{flex-direction:column}
+  .content{padding-top:0}
+  .page{padding:60px 14px 20px}
+
+  /* Topbar mobile — espace pour le hamburger */
+  .page-hd{padding-top:4px}
+  .page-title{font-size:18px}
+
+  /* Stats empilées */
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .stat-val{font-size:22px}
+
+  /* Filtres en colonne */
+  .filters{flex-direction:column;gap:8px;padding:12px 14px}
+  .filters input,.filters select{width:100%;min-width:unset;font-size:13px;box-sizing:border-box}
+
+  /* Tableau scrollable horizontalement */
+  .card{overflow:visible}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:560px}
+  th,td{padding:10px 12px;white-space:nowrap}
+  th{font-size:10px}
+  td{font-size:12px}
+
+  /* Pagination */
+  .pagination{flex-direction:column;gap:8px;text-align:center}
+
+  /* Modal plein écran sur mobile */
+  .overlay{padding:0;align-items:flex-end}
+  .modal{border-radius:14px 14px 0 0;max-height:92vh;max-width:100%;width:100%}
+
+  /* Formulaire transaction */
+  .tx-form{max-width:100%}
+  .type-btns{gap:8px}
+  .nets-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
+  .net-card{padding:10px 8px}
+
+  /* Users */
+  .users-grid{grid-template-columns:1fr;padding:12px}
+
+  /* Card header en colonne si trop étroit */
+  .card-hd{flex-wrap:wrap;gap:8px}
+
+  /* Sb-foot condensé */
+  .sb-foot{padding:12px}
+  #theme-btn{font-size:12px;padding:6px 10px}
+}
+
+/* ─── Très petit mobile (≤ 390px) ─── */
+@media(max-width:390px){
+  .stats-grid{grid-template-columns:1fr}
+  .type-btns{flex-direction:column}
+  .page{padding:56px 10px 16px}
+  .nets-grid{grid-template-columns:repeat(2,1fr)}
+}
+
 </style>
 </head>
 <body>
@@ -208,6 +303,8 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <!-- APP -->
 <div id="app" class="hidden">
+  <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+  <div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
   <div class="sidebar">
     <div class="sb-logo">
       <div class="logo-icon" style="width:32px;height:32px;font-size:14px">💳</div>
@@ -369,6 +466,24 @@ async function doLogin() {
 }
 document.getElementById('lp').onkeydown = e => { if(e.key==='Enter') doLogin(); };
 
+function toggleSidebar(){
+  const sb = document.querySelector('.sidebar');
+  const ov = document.getElementById('sb-overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('show');
+}
+function closeSidebar(){
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sb-overlay').classList.remove('show');
+}
+// Fermer la sidebar quand on clique sur un item nav (mobile)
+document.querySelectorAll && document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.nav-item').forEach(function(el){
+    el.addEventListener('click', function(){
+      if(window.innerWidth <= 768) closeSidebar();
+    });
+  });
+});
 function toggleTheme(){
   const isLight = document.documentElement.classList.toggle('light');
   localStorage.setItem('yapson_theme', isLight ? 'light' : 'dark');
@@ -407,6 +522,7 @@ function showApp() {
 }
 
 function goPage(name) {
+  if(window.innerWidth <= 768) closeSidebar();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -516,7 +632,7 @@ async function loadHist() {
 function renderTable(txs, cid) {
   const el=document.getElementById(cid);
   if(!txs.length) { el.innerHTML='<div class="empty">Aucune transaction</div>'; return; }
-  el.innerHTML=`<table><thead><tr><th>Réf</th><th>Type</th><th>Réseau</th><th>Téléphone</th><th>Montant</th><th>Statut</th><th>Date</th></tr></thead><tbody>
+  el.innerHTML=`<div class='table-wrap'><table><thead><tr><th>Réf</th><th>Type</th><th>Réseau</th><th>Téléphone</th><th>Montant</th><th>Statut</th><th>Date</th></tr></thead><tbody>
     ${txs.map(t=>`<tr>
       <td class="mono">${t.uid.substring(0,8)}…</td>
       <td><span class="badge badge-${t.type}">${t.type==='deposit'?'Dépôt':'Retrait'}</span></td>
@@ -526,7 +642,7 @@ function renderTable(txs, cid) {
       <td><span class="badge badge-${t.status}">${statLbl(t.status)}</span></td>
       <td style="color:var(--text2);font-size:12px">${fdt(t.created_at)}</td>
     </tr>`).join('')}
-  </tbody></table>`;
+  </tbody></table></div>`;
 }
 
 function statLbl(s) { return s==='success'?'Succès':s==='pending'?'En attente':s==='failed'?'Échoué':s; }
