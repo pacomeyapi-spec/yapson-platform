@@ -37,45 +37,63 @@ jobs:
           /tmp/gradle-dist/gradle-8.4/bin/gradle wrapper --gradle-version=8.4
           ./gradlew --version
 
-      - name: Generate keystore (same password for store and key)
+      - name: Generate keystore
         working-directory: android-app
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
+          # Écrire le mot de passe dans un fichier pour éviter les problèmes shell
+          echo -n "${KS_PASS}" > /tmp/ks_pass.txt
+          KS_PASS_CLEAN=$(cat /tmp/ks_pass.txt)
+          
           keytool -genkeypair -v \
             -keystore yapson.keystore \
             -alias yapson \
             -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass "${KEYSTORE_PASSWORD}" \
-            -keypass "${KEYSTORE_PASSWORD}" \
-            -dname "CN=Yapson, O=Yapson, C=CI"
+            -storepass "${KS_PASS_CLEAN}" \
+            -keypass "${KS_PASS_CLEAN}" \
+            -dname "CN=Yapson Platform, OU=Mobile, O=Yapson, L=Abidjan, ST=Abidjan, C=CI"
+          
+          echo "Keystore created:"
+          ls -lh yapson.keystore
 
-      - name: Build APK (debug)
+      - name: Build APK (debug, no signing needed)
         working-directory: android-app
         run: |
-          ./gradlew assembleDebug --no-daemon 2>&1 | tail -10
-          find app/build/outputs -name "*.apk"
+          ./gradlew assembleDebug --no-daemon 2>&1 | tail -15
+          echo "APK files:"
+          find app/build/outputs -name "*.apk" 2>/dev/null
 
-      - name: Sign APK with jarsigner
+      - name: Sign APK with apksigner (v1+v2+v3)
         working-directory: android-app
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
           echo "Signing: $APK"
-          jarsigner -verbose \
-            -keystore yapson.keystore \
-            -storepass "${KEYSTORE_PASSWORD}" \
-            -keypass "${KEYSTORE_PASSWORD}" \
-            -signedjar app-release-signed.apk \
-            "$APK" yapson
-          echo "Result:"
+          
+          # Zipalign d'abord
+          $ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign -f -p 4 "$APK" app-aligned.apk
+          
+          # Signer avec apksigner (v1+v2+v3) en passant le mdp via stdin
+          echo -n "${KS_PASS}" | $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
+            --ks yapson.keystore \
+            --ks-key-alias yapson \
+            --ks-pass stdin \
+            --key-pass stdin \
+            --out app-release-signed.apk \
+            app-aligned.apk
+          
+          # Vérifier la signature
+          $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner verify --verbose app-release-signed.apk
+          
+          echo "Final APK:"
           ls -lh app-release-signed.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: yapson-apk-v${{ github.run_number }}
+          name: yapson-platform-v${{ github.run_number }}
           path: android-app/app-release-signed.apk
           if-no-files-found: error
           retention-days: 90
