@@ -1044,7 +1044,12 @@ async function loadDash() {
     document.getElementById('s-success').textContent = txs.filter(t=>t.status==='success').length;
     document.getElementById('s-failed').textContent = txs.filter(t=>t.status==='failed').length;
     renderTable(txs,'dash-tx');
-  } catch(e) { document.getElementById('dash-tx').innerHTML=`<div class="empty">Erreur: ${e.message}</div>`; }
+  } catch(e) {
+    document.getElementById('dash-tx').innerHTML=`<div class="empty" style="color:var(--red)">⚠️ ${e.message}</div>`;
+    ['s-total','s-pending','s-success','s-failed'].forEach(id=>{document.getElementById(id).textContent='—';});
+  }
+  // Charger le solde séparément (indépendant des transactions)
+  loadBalance();
 }
 
 // ── HISTORY ──
@@ -1183,34 +1188,56 @@ function toast(msg,type='ok'){
 let balData = {};
 
 async function loadBalance() {
-  try {
-    const [myBal, pending, hist] = await Promise.all([
-      api('GET','/api/balance/me'),
-      api('GET','/api/balance/pending'),
-      api('GET','/api/balance/history')
-    ]);
-    balData = myBal;
+  // Helper : afficher erreur dans un conteneur (arrête le spinner)
+  function setErr(id, msg) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="empty" style="padding:20px;color:var(--red)">⚠️ ' + msg + '</div>';
+  }
 
-    // Sidebar + titre
+  // ── 1. Mon solde + code recharge ──────────────────────────────────────
+  try {
+    const myBal = await api('GET', '/api/balance/me');
+    balData = myBal;
     const balStr = Number(myBal.balance).toLocaleString('fr') + ' UV';
     document.getElementById('sb-balance-val').textContent = balStr;
     document.getElementById('bal-main-val').textContent = balStr;
-    if(document.getElementById('bal-rcode')) document.getElementById('bal-rcode').textContent = myBal.rechargeCode||'—';
-    if(document.getElementById('dash-rcode')) document.getElementById('dash-rcode').textContent = myBal.rechargeCode||'—';
-    document.getElementById('bal-sub').textContent = 'Solde: ' + balStr;
+    if (document.getElementById('bal-rcode'))  document.getElementById('bal-rcode').textContent  = myBal.rechargeCode || '—';
+    if (document.getElementById('dash-rcode')) document.getElementById('dash-rcode').textContent = myBal.rechargeCode || '—';
+    document.getElementById('bal-sub').textContent = 'Solde : ' + balStr;
+  } catch(e) {
+    console.error('loadBalance/me:', e.message);
+    document.getElementById('sb-balance-val').textContent = 'Erreur';
+  }
 
-    // Demandes en attente
+  // ── 2. Demandes en attente ─────────────────────────────────────────────
+  try {
+    const pending = await api('GET', '/api/balance/pending');
     renderPending(pending);
+  } catch(e) {
+    console.error('loadBalance/pending:', e.message);
+    setErr("pending-body", "Impossible de charger les demandes.");
+  }
 
-    // Historique
+  // ── 3. Historique ──────────────────────────────────────────────────────
+  try {
+    const hist = await api('GET', '/api/balance/history');
     renderBalHist(hist);
+  } catch(e) {
+    console.error('loadBalance/history:', e.message);
+    setErr("bal-hist-body", "Impossible de charger l'historique.");
+  }
 
-    // Soldes agents (admin seulement)
-    if (me.role === 'ADMIN') {
-      const agents = await api('GET','/api/balance/agents');
+  // ── 4. Soldes agents (admin) ───────────────────────────────────────────
+  if (me && me.role === 'ADMIN') {
+    try {
+      const agents = await api('GET', '/api/balance/agents');
       renderAgentsBal(agents);
+    } catch(e) {
+      console.error('loadBalance/agents:', e.message);
+      setErr("agents-bal-body", "Impossible de charger les soldes agents.");
     }
-  } catch(e) { console.error('loadBalance:', e.message); }
+  }
+
   // Mettre à jour l'alerte solde sur le formulaire de transaction
   checkSoldeAlert();
 }
