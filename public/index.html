@@ -617,7 +617,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
         <div class="uv-hero-left">
           <div class="uv-hero-icon">💎</div>
           <div>
-            <div class="uv-hero-label">Mon solde UV</div>
+            <div class="uv-hero-label">Mon solde</div>
             <div class="uv-hero-amount" id="bal-main-val">—</div>
           </div>
         </div>
@@ -771,7 +771,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
         <div class="uv-modal-body">
           <div class="uv-solde-banner">
             <span style="font-size:13px;color:var(--text2)">Solde disponible</span>
-            <span id="tr-solde-disp" class="uv-solde-banner-amt">—</span>
+            <span id="tr-solde-disp" class="uv-solde-banner-amt">— FCFA</span>
           </div>
           <div class="uv-info-box uv-info-blue">
             <span style="font-size:16px">ℹ️</span>
@@ -1210,14 +1210,17 @@ async function loadBalance() {
     const myBal = await api('GET', '/api/balance/me');
     balData = myBal;
     const balStr = Number(myBal.balance).toLocaleString('fr') + ' FCFA';
-    document.getElementById('sb-balance-val').textContent = balStr;
-    document.getElementById('bal-main-val').textContent = balStr;
-    if (document.getElementById('bal-rcode'))  document.getElementById('bal-rcode').textContent  = myBal.rechargeCode || '—';
-    if (document.getElementById('dash-rcode')) document.getElementById('dash-rcode').textContent = myBal.rechargeCode || '—';
-    document.getElementById('bal-sub').textContent = 'Solde : ' + balStr;
+    // getElementById sécurisé — certains éléments n'existent que sur certaines pages
+    const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    safe('sb-balance-val', balStr);
+    safe('bal-main-val',   balStr);
+    safe('bal-rcode',      myBal.rechargeCode || '—');
+    safe('dash-rcode',     myBal.rechargeCode || '—');
+    safe('bal-sub',        'Solde : ' + balStr);
   } catch(e) {
     console.error('loadBalance/me:', e.message);
-    document.getElementById('sb-balance-val').textContent = 'Erreur';
+    const el = document.getElementById('sb-balance-val');
+    if (el) el.textContent = '—';
   }
 
   // ── 2. Demandes en attente ─────────────────────────────────────────────
@@ -1356,17 +1359,21 @@ function renderPending(txs) {
   el.innerHTML = `<div class="table-wrap"><table>
     <thead><tr><th>De</th><th>Vers</th><th>Montant</th><th>Message</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>
-    ${txs.map(t => `<tr>
-      <td><strong>${t.sender?.username||'Admin'}</strong></td>
-      <td><strong>${t.receiver?.username||'—'}</strong></td>
-      <td class="mono" style="color:var(--green)"><strong>${Number(t.amount).toLocaleString('fr')} UV</strong></td>
-      <td style="color:var(--text2);font-size:12px">${t.note||'—'}</td>
-      <td style="color:var(--text2);font-size:12px">${fdt(t.createdAt)}</td>
-      <td>
-        <button class="btn btn-primary btn-sm" onclick="approveTransfer('${t.id}','approve')" style="padding:5px 10px;margin-right:4px">✅</button>
-        <button class="btn btn-danger btn-sm" onclick="approveTransfer('${t.id}','reject')" style="padding:5px 10px">❌</button>
-      </td>
-    </tr>`).join('')}
+    ${txs.map(t => {
+      const isRecharge = t.type === 'RECHARGE';
+      const senderLabel = isRecharge ? '<span style="font-size:10px;padding:2px 6px;background:rgba(0,229,160,.15);color:var(--green);border-radius:10px">RECHARGE</span>' : (t.sender?.username||'—');
+      return `<tr>
+        <td>${senderLabel}</td>
+        <td><strong>${t.receiver?.username||'—'}</strong></td>
+        <td class="mono" style="color:var(--green)"><strong>${Number(t.amount).toLocaleString('fr')} FCFA</strong></td>
+        <td style="color:var(--text2);font-size:12px">${t.note||'—'}</td>
+        <td style="color:var(--text2);font-size:12px">${fdt(t.createdAt)}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-primary btn-sm" onclick="approveTransfer('${t.id}','approve')" style="padding:5px 10px;margin-right:4px">✅ Valider</button>
+          <button class="btn btn-danger btn-sm" onclick="approveTransfer('${t.id}','reject')" style="padding:5px 10px">❌</button>
+        </td>
+      </tr>`;
+    }).join('')}
     </tbody></table></div>`;
 }
 
