@@ -25,9 +25,8 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity {
 
-    private WebView webView;
-    private ProgressBar progressBar;
-    private LinearLayout zoomBar;
+    private WebView       webView;
+    private ProgressBar   progressBar;
     private SharedPreferences prefs;
 
     private static final String APP_URL   = "https://yapson-platform-production.up.railway.app/";
@@ -35,7 +34,7 @@ public class MainActivity extends Activity {
     private static final int    ZOOM_MIN  = 75;
     private static final int    ZOOM_MAX  = 175;
     private static final int    ZOOM_STEP = 10;
-    private static final int    ZOOM_DEF  = 110; // légèrement agrandi par défaut
+    private static final int    ZOOM_DEF  = 110;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,42 +50,41 @@ public class MainActivity extends Activity {
 
         prefs = getSharedPreferences("yapson_prefs", Context.MODE_PRIVATE);
 
-        // ── Root layout ──
+        // ── Root ──
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor("#080b10"));
 
-        // ── Barre de progression ──
+        // ── Barre de progression top ──
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(100);
         progressBar.setVisibility(View.GONE);
         progressBar.setProgressTintList(
             android.content.res.ColorStateList.valueOf(Color.parseColor("#00e5a0"))
         );
-        FrameLayout.LayoutParams pbParams = new FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams pbp = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, 8
         );
-        pbParams.gravity = Gravity.TOP;
+        pbp.gravity = Gravity.TOP;
 
         // ── WebView ──
         webView = new WebView(this);
-        FrameLayout.LayoutParams wvParams = new FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams wvp = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         );
 
-        // ── Barre zoom flottante ──
-        zoomBar = buildZoomBar();
-        FrameLayout.LayoutParams zbParams = new FrameLayout.LayoutParams(
+        // ── Barre zoom flottante bas-droite ──
+        LinearLayout zoomBar = buildZoomBar();
+        FrameLayout.LayoutParams zbp = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         );
-        zbParams.gravity = Gravity.BOTTOM | Gravity.END;
-        zbParams.setMargins(0, 0, 24, 80);
+        zbp.gravity = Gravity.BOTTOM | Gravity.END;
+        zbp.setMargins(0, 0, 20, 72);
 
-        root.addView(webView, wvParams);
-        root.addView(progressBar, pbParams);
-        root.addView(zoomBar, zbParams);
-
+        root.addView(webView, wvp);
+        root.addView(progressBar, pbp);
+        root.addView(zoomBar, zbp);
         setContentView(root);
 
         setupWebView();
@@ -99,66 +97,65 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ── Construction de la barre zoom ──────────────────────────────────────
+    // ── Barre A− / A / A+ ─────────────────────────────────────────────────
     private LinearLayout buildZoomBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setBackgroundColor(Color.parseColor("#CC1a1f2e")); // semi-transparent
-        bar.setPadding(4, 4, 4, 4);
-        // coins arrondis via background dessiné
-        bar.setAlpha(0.92f);
+        bar.setPadding(6, 2, 6, 2);
 
-        // Arrondir les coins
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        android.graphics.drawable.GradientDrawable bg =
+            new android.graphics.drawable.GradientDrawable();
         bg.setColor(Color.parseColor("#CC1a1f2e"));
-        bg.setCornerRadius(48f);
+        bg.setCornerRadius(40f);
         bar.setBackground(bg);
-        bar.setPadding(8, 4, 8, 4);
 
-        bar.addView(makeZoomBtn("A−", -1));
-        bar.addView(makeZoomBtn("A", 0));   // reset
-        bar.addView(makeZoomBtn("A+", 1));
-
+        bar.addView(makeBtn("A\u2212", -1));  // A−
+        bar.addView(makeBtn("A",      0));    // reset
+        bar.addView(makeBtn("A+",     1));    // A+
         return bar;
     }
 
-    private TextView makeZoomBtn(String label, int direction) {
-        TextView btn = new TextView(this);
+    private TextView makeBtn(final String label, final int dir) {
+        final TextView btn = new TextView(this);
         btn.setText(label);
         btn.setTextColor(Color.parseColor("#00e5a0"));
-        btn.setTextSize(direction == 0 ? 13f : 16f);
+        btn.setTextSize(dir == 0 ? 13f : 16f);
         btn.setTypeface(Typeface.DEFAULT_BOLD);
-        btn.setPadding(20, 12, 20, 12);
+        btn.setPadding(18, 10, 18, 10);
         btn.setGravity(Gravity.CENTER);
-
-        btn.setOnClickListener(v -> {
-            int current = prefs.getInt(PREF_ZOOM, ZOOM_DEF);
-            int next;
-            if (direction == 0) {
-                next = ZOOM_DEF;
-            } else {
-                next = current + direction * ZOOM_STEP;
-                next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                int cur  = prefs.getInt(PREF_ZOOM, ZOOM_DEF);
+                int next;
+                if (dir == 0) {
+                    next = ZOOM_DEF;
+                } else {
+                    next = cur + dir * ZOOM_STEP;
+                    if (next < ZOOM_MIN) next = ZOOM_MIN;
+                    if (next > ZOOM_MAX) next = ZOOM_MAX;
+                }
+                applyZoom(next);
+                prefs.edit().putInt(PREF_ZOOM, next).apply();
+                // Flash feedback
+                btn.setTextColor(Color.WHITE);
+                btn.postDelayed(new Runnable() {
+                    @Override public void run() {
+                        btn.setTextColor(Color.parseColor("#00e5a0"));
+                    }
+                }, 150);
             }
-            applyZoom(next);
-            prefs.edit().putInt(PREF_ZOOM, next).apply();
-            // Feedback visuel : flash vert
-            btn.setTextColor(Color.WHITE);
-            btn.postDelayed(() -> btn.setTextColor(Color.parseColor("#00e5a0")), 150);
         });
-
         return btn;
     }
 
-    // ── Appliquer le zoom ──────────────────────────────────────────────────
     private void applyZoom(int zoom) {
         webView.getSettings().setTextZoom(zoom);
     }
 
-    // ── Configuration WebView ──────────────────────────────────────────────
+    // ── WebView setup ──────────────────────────────────────────────────────
     private void setupWebView() {
         WebSettings s = webView.getSettings();
-
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
@@ -169,8 +166,6 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setLoadWithOverviewMode(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-
-        // Viewport mobile — scale initial 1.0 pour un rendu net
         s.setInitialScale(0);
 
         CookieManager cm = CookieManager.getInstance();
