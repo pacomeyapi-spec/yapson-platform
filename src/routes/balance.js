@@ -161,3 +161,26 @@ router.get('/agents', authenticate, requireAdmin, async (req, res) => {
 });
 
 module.exports = router;
+
+// ── Demande de recharge (agent → admin) ──────────────────────────────────
+router.post('/recharge-request', authenticate, async (req, res) => {
+  const { amount, note } = req.body;
+  if (!amount || amount <= 0)
+    return res.status(400).json({ error: 'Montant invalide' });
+
+  // Trouve l'admin
+  const admin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+  if (!admin) return res.status(404).json({ error: 'Administrateur introuvable' });
+
+  const tx = await prisma.balanceTx.create({
+    data: {
+      type: 'TRANSFER',
+      amount,
+      note: note || 'Demande de recharge UV',
+      status: 'pending',
+      senderId: null,          // l'admin est la source (il n'est pas débité)
+      receiverId: req.user.id, // l'agent qui demande
+    }
+  });
+  res.json({ success: true, tx });
+});
