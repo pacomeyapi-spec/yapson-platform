@@ -15,7 +15,7 @@ model User {
   isActive        Boolean       @default(true)
   allowedNetworks String?
   balance         Float         @default(0)       // Solde UV
-  rechargeCode    String        @unique @default(cuid()) // Identifiant de recharge
+  rechargeCode    String?       @unique // Identifiant de recharge
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   transactions    Transaction[]

@@ -43,6 +43,19 @@ const PORT = process.env.PORT || 8080;
 async function start() {
   try {
     const adminExists = await prisma.user.findUnique({ where: { username: 'admin' } });
+    // Générer rechargeCode pour les users qui n'en ont pas encore
+    const { randomBytes } = require('crypto');
+    const usersWithoutCode = await prisma.user.findMany({
+      where: { rechargeCode: null }
+    });
+    for (const u of usersWithoutCode) {
+      await prisma.user.update({
+        where: { id: u.id },
+        data: { rechargeCode: randomBytes(6).toString('hex').toUpperCase() }
+      });
+      console.log('✅ rechargeCode généré pour:', u.username);
+    }
+
     if (!adminExists) {
       await prisma.user.create({
         data: {
