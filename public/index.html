@@ -1190,7 +1190,7 @@ async function doRequestRecharge() {
   if(!amount || amount <= 0) return toast('Entrez un montant valide','err');
   try {
     await api('POST', '/api/balance/recharge-request', { amount, note });
-    toast('✅ Demande envoyée à l'administrateur', 'ok');
+    toast('✅ Demande envoyée à l\'administrateur', 'ok');
     closeM('mod-uv-request');
     loadBalance();
   } catch(e) { toast(e.message, 'err'); }
@@ -1307,7 +1307,7 @@ function quickRecharge(code, username) {
   document.getElementById('rch-amt').focus();
   // Scroll vers le formulaire de recharge
   document.querySelector('#rch-code').scrollIntoView({ behavior:'smooth', block:'center' });
-  toast('Code de ' + username + ' inséré — entrez le montant','ok');
+  toast('Code de ' + username + ' inséré — entrez le montant', 'ok');
 }
 
 // AUTO LOGIN
