@@ -14,9 +14,13 @@ model User {
   role            String        @default("AGENT")
   isActive        Boolean       @default(true)
   allowedNetworks String?
+  balance         Float         @default(0)       // Solde UV
+  rechargeCode    String        @unique @default(cuid()) // Identifiant de recharge
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   transactions    Transaction[]
+  balanceSent     BalanceTx[]   @relation("Sender")
+  balanceReceived BalanceTx[]   @relation("Receiver")
 }
 
 model Transaction {
@@ -33,4 +37,19 @@ model Transaction {
   updatedAt       DateTime @updatedAt
   userId          String
   user            User     @relation(fields: [userId], references: [id])
+}
+
+// Mouvements de solde UV
+model BalanceTx {
+  id          String   @id @default(uuid())
+  type        String   // RECHARGE, TRANSFER, DEBIT_DEPOT, CREDIT_RETRAIT
+  amount      Float
+  note        String?
+  status      String   @default("pending") // pending, approved, rejected
+  senderId    String?
+  receiverId  String?
+  sender      User?    @relation("Sender", fields: [senderId], references: [id])
+  receiver    User?    @relation("Receiver", fields: [receiverId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

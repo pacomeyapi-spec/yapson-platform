@@ -20,6 +20,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/balance', require('./routes/balance'));
 
 // Health
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
