@@ -172,7 +172,7 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setLoadWithOverviewMode(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setInitialScale(0);
+        // setInitialScale sur WebView, pas WebSettings
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
