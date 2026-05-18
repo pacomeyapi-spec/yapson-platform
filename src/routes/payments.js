@@ -23,11 +23,43 @@ router.post('/transactions', authenticate, async (req, res) => {
   if (!type || !network || !phone || !amount)
     return res.status(400).json({ error: 'type, network, phone et amount requis' });
 
+  // ── Vérification du solde UV AVANT toute transaction ─────────────────────
   if (req.user.role !== 'ADMIN') {
+    const txType   = (type || '').toLowerCase();
+    const isDepot  = txType === 'deposit'    || txType === 'depot';
+    const isRetrait= txType === 'withdrawal' || txType === 'retrait';
+
+    // Recharger le solde depuis la BDD (pas le token JWT qui peut être obsolète)
+    const userFresh = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const solde     = userFresh ? userFresh.balance : 0;
+    const montant   = parseFloat(amount);
+
+    if (isDepot) {
+      // Un dépôt coûte des UV — il faut avoir assez
+      if (solde <= 0) {
+        return res.status(402).json({
+          error: 'Solde UV insuffisant',
+          detail: 'Votre solde est à 0 UV. Faites une demande de recharge avant de pouvoir effectuer un dépôt.',
+          solde,
+          montant
+        });
+      }
+      if (montant > solde) {
+        return res.status(402).json({
+          error: 'Solde UV insuffisant',
+          detail: `Vous n'avez que ${solde.toLocaleString('fr')} UV disponibles pour ce dépôt de ${montant.toLocaleString('fr')} FCFA. Rechargez votre solde.`,
+          solde,
+          montant
+        });
+      }
+    }
+
+    // Vérification des réseaux autorisés
     let allowed = null;
     try { allowed = req.user.allowedNetworks ? JSON.parse(req.user.allowedNetworks) : null; } catch {}
     if (!allowed || !allowed.includes(network))
       return res.status(403).json({ error: `Réseau "${network}" non autorisé` });
+
   }
 
   // Envoyer à ConnectPro

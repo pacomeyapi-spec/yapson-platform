@@ -533,8 +533,18 @@ tr:hover td{background:rgba(255,255,255,.015)}
           <label>Réseau</label>
           <div class="nets-grid" id="tx-nets"><div class="spin"></div></div>
         </div>
+        <!-- Alerte solde insuffisant pour dépôts -->
+        <div id="tx-solde-alert" style="display:none;background:rgba(255,68,102,.1);border:1px solid rgba(255,68,102,.3);
+          border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--red);line-height:1.5">
+          <strong>⚠️ Solde UV insuffisant</strong><br>
+          <span id="tx-solde-alert-msg">Votre solde est insuffisant pour effectuer ce dépôt.</span><br>
+          <button class="btn btn-ghost btn-sm" onclick="goPage('balance');openUVModal('request')" 
+            style="margin-top:8px;font-size:12px;color:var(--green);border-color:rgba(0,229,160,.3)">
+            ⬆️ Faire une demande de recharge
+          </button>
+        </div>
         <div class="field"><label>Numéro destinataire</label><input id="tx-phone" type="tel" placeholder="07 XX XX XX XX" oninput="updSum()"/></div>
-        <div class="field"><label>Montant (FCFA)</label><input id="tx-amt" type="number" placeholder="5000" min="1" oninput="updSum()"/></div>
+        <div class="field"><label>Montant (FCFA)</label><input id="tx-amt" type="number" placeholder="5000" min="1" oninput="updSum();checkSoldeAlert()"/></div>
         <div class="summary">
           <div class="sum-row"><span class="l">Type</span><span class="v" id="sum-t">Dépôt</span></div>
           <div class="sum-row"><span class="l">Réseau</span><span class="v" id="sum-n">—</span></div>
@@ -935,6 +945,7 @@ function setType(t) {
   document.getElementById('t-dep').classList.toggle('active',t==='deposit');
   document.getElementById('t-ret').classList.toggle('active',t==='withdrawal');
   document.getElementById('sum-t').textContent = t==='deposit'?'Dépôt':'Retrait';
+  checkSoldeAlert();
 }
 
 function updSum() {
@@ -943,6 +954,37 @@ function updSum() {
   document.getElementById('sum-p').textContent = document.getElementById('tx-phone').value||'—';
   const a = document.getElementById('tx-amt').value;
   document.getElementById('sum-a').textContent = a?Number(a).toLocaleString('fr')+' FCFA':'—';
+  checkSoldeAlert();
+}
+
+function checkSoldeAlert() {
+  // Vérification côté client (le serveur re-vérifie aussi)
+  if (!balData || me?.role === 'ADMIN') {
+    const el = document.getElementById('tx-solde-alert');
+    if(el) el.style.display = 'none';
+    return;
+  }
+  const isDepot = txType === 'deposit';
+  const solde = balData.balance || 0;
+  const montant = parseFloat(document.getElementById('tx-amt')?.value) || 0;
+  const alertEl = document.getElementById('tx-solde-alert');
+  const msgEl = document.getElementById('tx-solde-alert-msg');
+  const btn = document.getElementById('btn-tx');
+  
+  if (!alertEl) return;
+  
+  if (isDepot && solde <= 0) {
+    alertEl.style.display = 'block';
+    msgEl.textContent = 'Votre solde est à 0 UV. Vous devez vous recharger avant de pouvoir effectuer un dépôt.';
+    if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+  } else if (isDepot && montant > 0 && montant > solde) {
+    alertEl.style.display = 'block';
+    msgEl.textContent = `Montant (${montant.toLocaleString('fr')} FCFA) supérieur à votre solde (${solde.toLocaleString('fr')} UV). Rechargez votre solde.`;
+    if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+  } else {
+    alertEl.style.display = 'none';
+    if(btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  }
 }
 
 async function submitTx() {
@@ -951,14 +993,44 @@ async function submitTx() {
   const amt = document.getElementById('tx-amt').value;
   if(!phone) return toast('Entrez le numéro de téléphone','err');
   if(!amt||amt<=0) return toast('Montant invalide','err');
+
+  // Vérification solde client-side avant envoi
+  if (me?.role !== 'ADMIN' && txType === 'deposit' && balData) {
+    const solde = balData.balance || 0;
+    const montant = parseFloat(amt);
+    if (solde <= 0) {
+      toast('Solde UV insuffisant — Rechargez avant de faire un dépôt', 'err');
+      checkSoldeAlert();
+      return;
+    }
+    if (montant > solde) {
+      toast(`Solde insuffisant : ${solde.toLocaleString('fr')} UV disponibles`, 'err');
+      checkSoldeAlert();
+      return;
+    }
+  }
+
   const btn = document.getElementById('btn-tx');
   btn.disabled=true; btn.textContent='En cours...';
   try {
     const tx = await api('POST','/api/payments/transactions',{type:txType,network:selNet,phone,amount:parseFloat(amt)});
+    toast('Transaction créée avec succès','ok');
     document.getElementById('tx-phone').value=''; document.getElementById('tx-amt').value='';
     updSum();
-  } catch(e) { toast(e.message,'err'); }
-  finally { btn.disabled=false; btn.textContent='Créer la transaction →'; }
+    // Recharger le solde (il vient d'être débité si dépôt)
+    loadBalance();
+  } catch(e) {
+    // Afficher le détail si erreur 402 (solde insuffisant)
+    const msg = e.detail || e.message || 'Erreur';
+    toast(msg, 'err');
+    // Rafraîchir le solde et re-vérifier
+    await loadBalance();
+    checkSoldeAlert();
+  }
+  finally {
+    btn.disabled=false; btn.textContent='Créer la transaction →';
+    btn.style.opacity='1';
+  }
 }
 
 // ── DASHBOARD ──
@@ -1139,6 +1211,8 @@ async function loadBalance() {
       renderAgentsBal(agents);
     }
   } catch(e) { console.error('loadBalance:', e.message); }
+  // Mettre à jour l'alerte solde sur le formulaire de transaction
+  checkSoldeAlert();
 }
 
 function copyRcode() {
