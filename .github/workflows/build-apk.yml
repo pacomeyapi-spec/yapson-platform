@@ -60,7 +60,7 @@ jobs:
       - name: Build APK (debug, no signing needed)
         working-directory: android-app
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -50
+          ./gradlew assembleDebug --no-daemon --rerun-tasks 2>&1 | tail -30
           echo "APK files:"
           find app/build/outputs -name "*.apk" 2>/dev/null
 
