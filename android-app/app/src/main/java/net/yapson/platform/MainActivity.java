@@ -50,30 +50,26 @@ public class MainActivity extends Activity {
 
         prefs = getSharedPreferences("yapson_prefs", Context.MODE_PRIVATE);
 
-        // ── Root ──
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor("#080b10"));
 
-        // ── Barre de progression top ──
+        // Progress bar
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(100);
         progressBar.setVisibility(View.GONE);
-        progressBar.setProgressTintList(
-            android.content.res.ColorStateList.valueOf(Color.parseColor("#00e5a0"))
-        );
         FrameLayout.LayoutParams pbp = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, 8
         );
         pbp.gravity = Gravity.TOP;
 
-        // ── WebView ──
+        // WebView
         webView = new WebView(this);
         FrameLayout.LayoutParams wvp = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         );
 
-        // ── Barre zoom flottante bas-droite ──
+        // Zoom bar
         LinearLayout zoomBar = buildZoomBar();
         FrameLayout.LayoutParams zbp = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -97,36 +93,47 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ── Barre A− / A / A+ ─────────────────────────────────────────────────
     private LinearLayout buildZoomBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setPadding(6, 2, 6, 2);
 
         android.graphics.drawable.GradientDrawable bg =
             new android.graphics.drawable.GradientDrawable();
-        bg.setColor(Color.parseColor("#CC1a1f2e"));
+        bg.setColor(0xCC1a1f2e);
         bg.setCornerRadius(40f);
         bar.setBackground(bg);
+        bar.setPadding(8, 4, 8, 4);
 
-        bar.addView(makeBtn("A\u2212", -1));  // A−
-        bar.addView(makeBtn("A",      0));    // reset
-        bar.addView(makeBtn("A+",     1));    // A+
+        bar.addView(makeBtn("A-", -1));
+        bar.addView(makeSep());
+        bar.addView(makeBtn("A", 0));
+        bar.addView(makeSep());
+        bar.addView(makeBtn("A+", 1));
         return bar;
+    }
+
+    private View makeSep() {
+        View sep = new View(this);
+        sep.setBackgroundColor(0x4400e5a0);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(1, 
+            LinearLayout.LayoutParams.MATCH_PARENT);
+        p.setMargins(0, 6, 0, 6);
+        sep.setLayoutParams(p);
+        return sep;
     }
 
     private TextView makeBtn(final String label, final int dir) {
         final TextView btn = new TextView(this);
         btn.setText(label);
-        btn.setTextColor(Color.parseColor("#00e5a0"));
-        btn.setTextSize(dir == 0 ? 13f : 16f);
+        btn.setTextColor(0xFF00e5a0);
+        btn.setTextSize(dir == 0 ? 13f : 15f);
         btn.setTypeface(Typeface.DEFAULT_BOLD);
-        btn.setPadding(18, 10, 18, 10);
+        btn.setPadding(20, 12, 20, 12);
         btn.setGravity(Gravity.CENTER);
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                int cur  = prefs.getInt(PREF_ZOOM, ZOOM_DEF);
+                int cur = prefs.getInt(PREF_ZOOM, ZOOM_DEF);
                 int next;
                 if (dir == 0) {
                     next = ZOOM_DEF;
@@ -137,11 +144,11 @@ public class MainActivity extends Activity {
                 }
                 applyZoom(next);
                 prefs.edit().putInt(PREF_ZOOM, next).apply();
-                // Flash feedback
-                btn.setTextColor(Color.WHITE);
+                btn.setTextColor(0xFFFFFFFF);
                 btn.postDelayed(new Runnable() {
-                    @Override public void run() {
-                        btn.setTextColor(Color.parseColor("#00e5a0"));
+                    @Override
+                    public void run() {
+                        btn.setTextColor(0xFF00e5a0);
                     }
                 }, 150);
             }
@@ -153,7 +160,6 @@ public class MainActivity extends Activity {
         webView.getSettings().setTextZoom(zoom);
     }
 
-    // ── WebView setup ──────────────────────────────────────────────────────
     private void setupWebView() {
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
@@ -188,12 +194,8 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int p) {
-                if (p < 100) {
-                    progressBar.setVisibility(View.VISIBLE);
-                    progressBar.setProgress(p);
-                } else {
-                    progressBar.setVisibility(View.GONE);
-                }
+                progressBar.setVisibility(p < 100 ? View.VISIBLE : View.GONE);
+                progressBar.setProgress(p);
             }
         });
 
