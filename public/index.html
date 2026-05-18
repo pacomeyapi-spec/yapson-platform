@@ -243,10 +243,11 @@ tr:hover td{background:rgba(255,255,255,.015)}
   /* Contenu prend toute la largeur */
   #app{flex-direction:column}
   .content{padding-top:0}
-  .page{padding:60px 14px 20px}
+  .page{padding:52px 14px 16px}
 
   /* Topbar mobile — espace pour le hamburger */
-  .page-hd{padding-top:4px}
+  .page-hd{padding-top:2px;margin-bottom:14px}
+  .page-balance .page-hd{margin-bottom:10px}
   .page-title{font-size:18px}
 
   /* Stats empilées */
@@ -293,7 +294,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 @media(max-width:390px){
   .stats-grid{grid-template-columns:1fr}
   .type-btns{flex-direction:column}
-  .page{padding:56px 10px 16px}
+  .page{padding:50px 10px 14px}
   .nets-grid{grid-template-columns:repeat(2,1fr)}
 }
 
@@ -397,10 +398,18 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 /* Responsive */
 @media(max-width:700px){
-  .uv-hero{flex-direction:column;align-items:flex-start;gap:16px;padding:20px}
-  .uv-hero-right{text-align:left}
-  .uv-hero-amount{font-size:32px}
-  .uv-actions{grid-template-columns:1fr}
+  .uv-hero{flex-direction:column;align-items:flex-start;gap:12px;padding:16px 14px;margin-bottom:14px}
+  .uv-hero-left{gap:12px}
+  .uv-hero-icon{width:44px;height:44px;font-size:20px;border-radius:12px}
+  .uv-hero-right{text-align:left;width:100%}
+  .uv-hero-amount{font-size:28px;letter-spacing:-1px}
+  .uv-hero-label{font-size:10px;margin-bottom:4px}
+  .uv-rcode-val{font-size:13px}
+  .uv-actions{grid-template-columns:1fr;gap:10px;margin-bottom:14px}
+  .uv-card-body{padding:18px 16px}
+  .uv-card-title{font-size:15px}
+  .uv-card-desc{font-size:12px}
+  .uv-card-icon{width:40px;height:40px;font-size:18px;margin-bottom:12px}
   .uv-admin-rch-grid{grid-template-columns:1fr}
 }
 /* ════════════════════════════════════════════════════════════════════════ */
@@ -592,10 +601,10 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
     <!-- BALANCE UV -->
     <!-- ════════ GESTION UV ════════ -->
-    <div id="page-balance" class="page">
+    <div id="page-balance" class="page page-balance">
 
       <!-- En-tête -->
-      <div class="page-hd">
+      <div class="page-hd" style="margin-bottom:16px">
         <div class="page-title">💎 Gestion UV</div>
         <div class="page-sub">Gérez vos unités de valeur — rechargez et transférez</div>
       </div>
