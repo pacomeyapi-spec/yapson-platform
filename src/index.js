@@ -13,8 +13,20 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-// Servir le frontend
-app.use(express.static(path.join(__dirname, '../public')));
+// Servir le frontend — no-cache pour index.html (forcer rechargement du code JS)
+app.get('/', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+app.use(express.static(path.join(__dirname, '../public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+  }
+}));
 
 // Routes API
 app.use('/api/auth', require('./routes/auth'));
