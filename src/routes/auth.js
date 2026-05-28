@@ -24,4 +24,9 @@ router.post('/login', async (req, res) => {
   res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
 });
 
+// ── Vérifier token (utilisé au démarrage) ────────────────────────────────
+router.get('/me', require('../middleware/auth').authenticate, (req, res) => {
+  res.json({ id: req.user.id, username: req.user.username, role: req.user.role });
+});
+
 module.exports = router;

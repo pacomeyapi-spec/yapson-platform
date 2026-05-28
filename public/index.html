@@ -833,6 +833,16 @@ async function api(method, path, body) {
     ...(body?{body:JSON.stringify(body)}:{})
   });
   const d = await r.json();
+  if (r.status === 401) {
+    // Token expiré ou invalide — déconnexion silencieuse
+    localStorage.removeItem('yt');
+    localStorage.removeItem('ym');
+    token = null; me = null;
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    // Pas de toast "Token invalide" — juste retour à l'écran de login
+    return null;
+  }
   if (!r.ok) throw new Error(d.error||d.detail||'Erreur');
   return d;
 }
@@ -1428,7 +1438,24 @@ function quickRecharge(code, username) {
 }
 
 // AUTO LOGIN
-if(token&&me) showApp();
+if(token&&me) {
+  // Vérifier silencieusement que le token est encore valide
+  fetch(API+'/api/auth/me', {
+    headers: { 'Authorization': 'Bearer '+token }
+  }).then(r => {
+    if (r.ok) {
+      showApp();
+    } else {
+      // Token invalide — nettoyer sans message d'erreur
+      localStorage.removeItem('yt');
+      localStorage.removeItem('ym');
+      token = null; me = null;
+    }
+  }).catch(() => {
+    // Erreur réseau — essayer quand même (offline mode)
+    showApp();
+  });
+}
 </script>
 </body>
 </html>
